@@ -44,19 +44,21 @@ jobs:
           cfg_version=$(node -p "require('./src-tauri/tauri.conf.json').version")
           pkg_version=$(node -p "require('./package.json').version")
           
-          # 👇 修复点1：显式指定 Cargo.toml 的路径，防止找不到
-          # 👇 修复点2：增加容错，防止 cargo metadata 报错导致 Node.js 解析空内容崩溃
-          cargo_version=$(cargo metadata --no-deps --format-version 1 --manifest-path src-tauri/Cargo.toml | node -p "
-            let d=''; 
-            process.stdin.resume(); 
-            process.stdin.on('data', c => d += c); 
-            process.stdin.on('end', () => { 
-              try { 
-                console.log(JSON.parse(d).packages[0].version); 
-              } catch(e) { 
-                process.stderr.write('Failed to parse cargo metadata: ' + d + '\n'); 
-                process.exit(1); 
-              } 
+          # 👇 修复点：使用 node -e 显式等待 stdin 读取完毕，避免打印 Socket 对象
+          cargo_version=$(cargo metadata --no-deps --format-version 1 --manifest-path src-tauri/Cargo.toml | node -e "
+            let d = '';
+            process.stdin.setEncoding('utf8');
+            process.stdin.on('data', chunk => d += chunk);
+            process.stdin.on('end', () => {
+              try {
+                const meta = JSON.parse(d);
+                // 优先按包名查找，防止 workspace 多包时取错
+                const pkg = meta.packages.find(p => p.name === 'zhiti2.0') || meta.packages[0];
+                console.log(pkg.version);
+              } catch (e) {
+                process.stderr.write('JSON Parse Error: ' + e.message + '\nRaw: ' + d.substring(0, 200) + '\n');
+                process.exit(1);
+              }
             });
           ")
 
