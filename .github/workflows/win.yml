@@ -1,4 +1,4 @@
-name: Release
+name: only win
 
 # 触发方式：
 #  1) 推送 v* 形式的标签（推荐），例如：git tag v2.0.0 && git push origin v2.0.0
